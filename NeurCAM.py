@@ -34,6 +34,7 @@ class NeurCAM:
                  kl_weight:float  = 1.0,
                  smart_init: str = 'none',
                  model_dir: str = 'NeurCAMCheckpoints',
+                 device: str = 'auto',
                  verbose = True
                  ):
         """
@@ -84,6 +85,10 @@ class NeurCAM:
         self.feature_names = None
         self.n_features = -1
         self.repr_dim = -1
+        self.device = device
+        if self.device == 'auto':
+            self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+
 
     def fit(self, X: pd.DataFrame| np.ndarray, X_repr: pd.DataFrame | np.ndarray = None):
         """
@@ -109,8 +114,10 @@ class NeurCAM:
 
         self.n_features = X.shape[1]
         self.repr_dim = X_repr.shape[1]
-        dataset = TensorDataset(torch.tensor(X, dtype=torch.float32), torch.tensor(X_repr, dtype=torch.float32))
+        dataset = TensorDataset(torch.tensor(X, dtype=torch.float32, device=self.device), torch.tensor(X_repr, dtype=torch.float32, device=self.device))
+
         dataloader =  DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        
 
         if self.sf_channels <= 1.0:
             self.single_feature_channels = max(0, int(self.sf_channels * self.n_features))
@@ -130,17 +137,23 @@ class NeurCAM:
             hidden_layers = self.hidden_layers,
             n_clusters = self.k
         )
-        
+        # move to device
+        model = model.to(self.device)
+
 
         if self.smart_init == 'kmeans':
             kmeans = KMeans(n_clusters=self.k, random_state=self.random_state, n_init=10)
             kmeans.fit(X_repr)
-            model.centroids.data = torch.tensor(kmeans.cluster_centers_, dtype=torch.float32)
+            tens = torch.tensor(kmeans.cluster_centers_, dtype=torch.float32)
+            tens.to(model.centroids.data.device)
+            model.centroids.data = tens
 
         elif self.smart_init == 'mbkmeans':
             kmeans = MiniBatchKMeans(n_clusters=self.k, random_state=self.random_state, n_init=10)
             kmeans.fit(X_repr)
-            model.centroids.data = torch.tensor(kmeans.cluster_centers_, dtype=torch.float32)
+            tens = torch.tensor(kmeans.cluster_centers_, dtype=torch.float32)
+            tens.to(model.centroids.data.device)
+            model.centroids.data = tens
         else:
             model._initialize_centroids(dataloader, init_size=3)
             
@@ -202,10 +215,11 @@ class NeurCAM:
             hidden_layers = self.hidden_layers,
             n_clusters = self.k
         )
+        model_copy.to(self.device)
         model_copy.load_state_dict(best_ckpt)
         model_copy.eval()
-
-        
+        del best_ckpt
+        gc.collect()
         
         if self.pairwise_feature_channels > 0:
             if self.verbose and self.pairwise_feature_channels > 0:
@@ -359,7 +373,7 @@ class NeurCAM:
         """
         if isinstance(X, pd.DataFrame):
             X = X.values
-        X = torch.tensor(X, dtype=torch.float32)
+        X = torch.tensor(X, dtype=torch.float32, device=self.device)
         test_loader = DataLoader(X, batch_size=self.batch_size, shuffle=False)
         predictions = []
         self.model.eval()
