@@ -1,0 +1,27 @@
+name: NeurCAM
+channels:
+  - conda-forge
+  - pytorch
+  - plotly
+  - nvidia
+dependencies:
+  - python=3.11
+  - jupyterlab
+  - matplotlib
+  - numpy
+  - pandas
+  - pytorch
+  - pytorch-cuda>=11.8
+  - plotly
+  - scipy
+  - tqdm
+  - pip
+  - ipywidgets
+  - scikit-learn
+  - seaborn
+  - pip:
+      - nbdev
+      - black
+      - wrds
+      - kaleido
+      - entmax
