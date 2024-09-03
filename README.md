@@ -1,5 +1,5 @@
 # NeurCAM
-This is the repository for the Neural Clustering Additive Model. 
+This is the official implementation of the Neural Clustering Additive Model (NeurCAM): https://arxiv.org/abs/2408.13361
 
 ## Environment Setup
 To set up the environment, run the following commands:
